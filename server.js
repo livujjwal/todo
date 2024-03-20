@@ -4,9 +4,13 @@ const bcrypt = require("bcrypt");
 const session = require("express-session");
 const mongoDbSession = require("connect-mongodb-session")(session);
 require("dotenv").config();
+
+//file transfer
 const { userValidation, isEmailRgex } = require("./utils/userValidation");
-const userModel = require("./Models/userModel");
+const {userModel,sessionModel }= require("./Models/userModel");
 const { isAuth } = require("./middleware/authMiddleware");
+const todoModel = require("./Models/todoModel");
+const todoValidation = require("./utils/todoValidation");
 
 //variables
 const app = express();
@@ -73,11 +77,7 @@ app.post("/signup", async (req, res) => {
       password: hashPassword,
     });
     const userDb = await userObj.save();
-    return res.send({
-      status: 201,
-      message: "User Sign Up Successfully",
-      data: userDb,
-    });
+    return res.redirect("/login");
   } catch (error) {
     if (error.keyValue.username || error.keyValue.email)
       return res.send({
@@ -87,7 +87,6 @@ app.post("/signup", async (req, res) => {
           : "Email already registered",
       });
   }
-  console.log(name, email, username, password);
 });
 //login
 app.get("/login", (req, res) => {
@@ -121,12 +120,7 @@ app.post("/login", async (req, res) => {
       email: userDB.email,
       username: userDB.username,
     };
-    console.log(req.session);
-    return res.send({
-      status: 200,
-      message: "User Login Successfully",
-      user: userDB,
-    });
+    return res.redirect("/dashboard");
   } catch (error) {
     console.log(error);
     return res.send({
@@ -135,10 +129,57 @@ app.post("/login", async (req, res) => {
     });
   }
 });
-
+//dashboard
 app.get("/dashboard", isAuth, (req, res) => {
-  return res.send({
-    status: 201,
-    message: "Api working fine",
-  });
+  return res.render("dashboard");
 });
+//add-item
+app.post("/create-item",isAuth,async (req,res)=>{
+  const todo =  req.body.todo
+  const username = req.session.user.username
+  try {
+    const isValidTodo = await todoValidation(todo) 
+  } catch (error) {
+    return res.status(400).json(error)
+  }
+  try {
+    const todoObj = new todoModel({
+    todo,
+    username
+  })
+  const todoDB = await todoObj.save()
+ return res.send({
+  status:201,
+  message:"Item Added successfull!",
+  data:todoDB
+})
+
+} catch (error) {
+  return res.send({
+    status:500,
+    message:"Internal Server Error Ocuur"
+  })
+}
+})
+//logout
+app.post("/logout",isAuth,(req,res)=>{
+  req.session.destroy((error)=>{
+    if(error) return res.send({
+      status : 500,
+      message : "Database server error occur"
+    })
+    return res.redirect("/login")
+  })
+})
+//logout_from_all_devices
+app.post("/logout_from_all_devices",isAuth,async (req,res)=>{
+  const username = req.session.user.username
+  console.log(req.session.user.username);
+  try {
+ const deleteCount =await sessionModel.deleteMany(({"session.user.username":username}))
+ console.log(deleteCount);
+    return res.redirect('/login')
+  } catch (error) {
+    res.status(500).json("Internal server error occur")
+  }
+})
