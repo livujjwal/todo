@@ -1,18 +1,33 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const session = require("express-session");
+const mongoDbSession = require("connect-mongodb-session")(session);
+require("dotenv").config();
 const { userValidation, isEmailRgex } = require("./utils/userValidation");
 const userModel = require("./Models/userModel");
-const bcrypt = require("bcrypt");
-require("dotenv").config();
+const { isAuth } = require("./middleware/authMiddleware");
 
 //variables
 const app = express();
 const PORT = process.env.PORT;
-
+const store = new mongoDbSession({
+  uri: process.env.MONGO_URI,
+  collection: "sessions",
+});
 //middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.set("view engine", "ejs");
+app.use(
+  session({
+    secret: process.env.SECRET_KEY,
+    resave: false,
+    saveUninitialized: false,
+    store,
+  })
+);
+
 app.listen(PORT, () => {
   console.log("Server running at PORT:" + PORT);
 });
@@ -99,7 +114,14 @@ app.post("/login", async (req, res) => {
         status: 400,
         message: "Incorrect Password",
       });
-    console.log(userDB);
+    //session change and save to DB
+    req.session.isAuth = true;
+    req.session.user = {
+      userId: userDB._id,
+      email: userDB.email,
+      username: userDB.username,
+    };
+    console.log(req.session);
     return res.send({
       status: 200,
       message: "User Login Successfully",
@@ -112,4 +134,11 @@ app.post("/login", async (req, res) => {
       message: "Server error",
     });
   }
+});
+
+app.get("/dashboard", isAuth, (req, res) => {
+  return res.send({
+    status: 201,
+    message: "Api working fine",
+  });
 });
