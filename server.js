@@ -47,9 +47,7 @@ mongoose
   });
 
 //home
-app.get("/", (req, res) => {
-  return res.send("Home page");
-});
+
 //signup
 app.get("/signup", (req, res) => {
   return res.render("signupPage");
@@ -89,7 +87,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 //login
-app.get("/login", (req, res) => {
+app.get("/", (req, res) => {
   return res.render("loginPage");
 });
 app.post("/login", async (req, res) => {
