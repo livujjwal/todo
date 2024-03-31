@@ -1,4 +1,4 @@
-const todoValidation = (todo) => {
+const todoValidation = ({ todo }) => {
   return new Promise((resolve, reject) => {
     if (!todo) reject("Please create a entry");
     if (typeof todo !== "string") reject("Todo is not a text");

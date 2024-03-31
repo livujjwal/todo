@@ -31,7 +31,7 @@ app.use(
     store,
   })
 );
-
+app.use(express.static("public"));
 app.listen(PORT, () => {
   console.log("Server running at PORT:" + PORT);
 });
@@ -133,34 +133,134 @@ app.post("/login", async (req, res) => {
 app.get("/dashboard", isAuth, (req, res) => {
   return res.render("dashboard");
 });
-//add-item
-app.post("/create-item",isAuth,async (req,res)=>{
-  const todo =  req.body.todo
-  const username = req.session.user.username
+//create-item
+app.post("/create-item", isAuth, async (req, res) => {
+  const todo = req.body.todo;
+  const username = req.session.user.username;
   try {
-    const isValidTodo = await todoValidation(todo) 
+    await todoValidation({ todo });
   } catch (error) {
-    return res.status(400).json(error)
+    return res.send({
+      status: 400,
+      message: error,
+    });
   }
   try {
     const todoObj = new todoModel({
-    todo,
-    username
-  })
-  const todoDB = await todoObj.save()
- return res.send({
-  status:201,
-  message:"Item Added successfull!",
-  data:todoDB
-})
-
-} catch (error) {
-  return res.send({
-    status:500,
-    message:"Internal Server Error Ocuur"
-  })
-}
-})
+      todo,
+      username,
+    });
+    const todoDB = await todoObj.save();
+    return res.send({
+      status: 200,
+      data: todoDB,
+    });
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Internal Server Error Ocuur",
+    });
+  }
+});
+//read-item
+app.get("/read-item", isAuth, async (req, res) => {
+  const username = req.session.user.username;
+  const SKIP = Number(req.query.skip) || 0;
+  const LIMIT = 2;
+  try {
+    const todoList = await todoModel.aggregate([
+      { $match: { username } },
+      {
+        $facet: {
+          data: [{ $skip: SKIP }, { $limit: LIMIT }],
+        },
+      },
+    ]);
+    console.log(todoList[0].data);
+    if (todoList[0].data.length === 0) {
+      return res.send({
+        status: 400,
+        message: "No Todo Found, Add Todo",
+      });
+    }
+    // const todoList = await todoModel.find({ username });
+    return res.send({
+      status: 200,
+      message: "read data",
+      data: todoList[0].data,
+    });
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Internal server error occur",
+      error: error,
+    });
+  }
+});
+//edit todo
+app.post("/edit-item", isAuth, async (req, res) => {
+  const { todo, todoId } = req.body;
+  const username = req.session.user.username;
+  try {
+    await todoValidation({ todo });
+  } catch (error) {
+    return res.send({
+      status: 400,
+      error: error,
+    });
+  }
+  try {
+    const todoDB = await todoModel.findOne({ _id: todoId });
+    if (username !== todoDB.username) {
+      return res.send({
+        status: 403,
+        message: "Forbidden action for current user",
+      });
+    }
+    const updatedTodo = await todoModel.findOneAndUpdate(
+      { _id: todoId },
+      { todo }
+    );
+    return res.send({
+      status: 200,
+      message: "Upated successfull",
+      data: updatedTodo,
+    });
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Internal Server Error",
+      error: error,
+    });
+  }
+});
+//delete todo
+app.post("/delete-item", isAuth, async (req, res) => {
+  const { todoId } = req.body;
+  // console.log(todoId);
+  const username = req.session.user.username;
+  try {
+    const todoDB = await todoModel.findOne({ _id: todoId });
+    if (username !== todoDB.username) {
+      return res.send({
+        status: 403,
+        message: "Forbidden action for current user",
+      });
+    }
+    const updatedTodo = await todoModel.findOneAndDelete({ _id: todoId });
+    return res.send({
+      status: 201,
+      message: "Upated successfull",
+      data: updatedTodo,
+    });
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Internal Server Error",
+      error: error,
+    });
+  }
+});
 //logout
 app.post("/logout",isAuth,(req,res)=>{
   req.session.destroy((error)=>{
