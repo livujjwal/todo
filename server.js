@@ -2,12 +2,18 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const session = require("express-session");
+const jwt = require("jsonwebtoken");
 const mongoDbSession = require("connect-mongodb-session")(session);
 require("dotenv").config();
 
 //file transfer
-const { userValidation, isEmailRgex } = require("./utils/userValidation");
-const {userModel,sessionModel }= require("./Models/userModel");
+const {
+  userValidation,
+  isEmailRgex,
+  generateToken,
+  sendVefrificationEmail,
+} = require("./utils/userValidation");
+const { userModel, sessionModel } = require("./Models/userModel");
 const { isAuth } = require("./middleware/authMiddleware");
 const todoModel = require("./Models/todoModel");
 const todoValidation = require("./utils/todoValidation");
@@ -49,7 +55,7 @@ mongoose
 //home
 
 //signup
-app.get("/signup", (req, res) => {
+app.get("/", (req, res) => {
   return res.render("signupPage");
 });
 app.post("/signup", async (req, res) => {
@@ -75,6 +81,12 @@ app.post("/signup", async (req, res) => {
       password: hashPassword,
     });
     const userDb = await userObj.save();
+    //generateToken
+    const verifiedToken = generateToken(email);
+    console.log(verifiedToken);
+    //send verification email
+    sendVefrificationEmail(email, verifiedToken);
+
     return res.redirect("/login");
   } catch (error) {
     if (error.keyValue.username || error.keyValue.email)
@@ -87,7 +99,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 //login
-app.get("/", (req, res) => {
+app.get("/login", (req, res) => {
   return res.render("loginPage");
 });
 app.post("/login", async (req, res) => {
@@ -104,6 +116,10 @@ app.post("/login", async (req, res) => {
         status: 400,
         message: "Incorrect Login Credentials",
       });
+    //email verification check
+    if (!userDB.isEmailVerified) {
+      return res.status(400).json("Please verify email first, then login");
+    }
     //compare password
     const isPasswordMatch = await bcrypt.compare(password, userDB.password);
     if (!isPasswordMatch)
@@ -124,6 +140,23 @@ app.post("/login", async (req, res) => {
     return res.send({
       status: 500,
       message: "Server error",
+    });
+  }
+});
+//token api
+app.get("/verifytoken/:token", async (req, res) => {
+  const token = req.params.token;
+  const userEmail = jwt.verify(token, process.env.SECRET_KEY);
+  try {
+    await userModel.findOneAndUpdate(
+      { email: userEmail },
+      { isEmailVerified: true }
+    );
+    return res.redirect("/login");
+  } catch (error) {
+    return res.send({
+      status: 500,
+      message: "Internal Server Error",
     });
   }
 });
