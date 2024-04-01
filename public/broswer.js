@@ -32,6 +32,21 @@ function todoCreator() {
     .catch((error) => console.log(error));
 }
 document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("login")) {
+    console.log("login");
+    axios
+      .get("/")
+      .then()
+      .catch((err) => alert(err));
+  } else if (e.target.classList.contains("signup")) {
+    console.log("signup");
+    axios
+      .get("/signup")
+      .then()
+      .catch((err) => alert(err));
+  }
+});
+document.addEventListener("click", (e) => {
   if (e.target.classList.contains("edit-me")) {
     const todo = prompt("Enter new todo text");
     const todoId = e.target.getAttribute("data-id");
